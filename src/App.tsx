@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import "./styles.css";
 
 type Manager = {
@@ -32,10 +32,12 @@ type DraftState = {
   picks: Pick[];
 };
 
-type ShareStatus = "idle" | "copied" | "error";
+type RoomSyncStatus = "local" | "loading" | "saving" | "saved" | "error";
 
 const STORAGE_KEY = "world-cup-draft-state-v1";
-const ROOM_HASH_KEY = "room";
+const ROOM_KEY_STORAGE = "world-cup-draft-room-key-v1";
+const ROOM_KEY_PARAM = "room";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, "") ?? "";
 
 const DEFAULT_MANAGERS: Manager[] = [
   { id: "m1", name: "Devon" },
@@ -154,44 +156,41 @@ function normalizeDraftState(candidate: unknown): DraftState | null {
   };
 }
 
-function encodeRoomState(draft: DraftState) {
-  const bytes = new TextEncoder().encode(JSON.stringify(draft));
-  let binary = "";
-
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/g, "");
-}
-
-function decodeRoomState(token: string) {
-  try {
-    const paddedToken = token.replaceAll("-", "+").replaceAll("_", "/");
-    const padding = "=".repeat((4 - (paddedToken.length % 4)) % 4);
-    const binary = atob(paddedToken + padding);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    return normalizeDraftState(JSON.parse(new TextDecoder().decode(bytes)));
-  } catch {
-    return null;
-  }
-}
-
-function getRoomTokenFromHash() {
-  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
-  if (!hash) {
+function normalizeRoomKey(value: string | null | undefined) {
+  if (!value) {
     return null;
   }
 
-  const params = new URLSearchParams(hash);
-  return params.get(ROOM_HASH_KEY);
+  const trimmedValue = value.trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(trimmedValue)) {
+    return null;
+  }
+
+  return trimmedValue;
 }
 
-function buildRoomLink(token: string) {
-  return `${window.location.origin}${window.location.pathname}${window.location.search}#${ROOM_HASH_KEY}=${token}`;
+function createRoomKey() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+
+  const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return token;
 }
 
-function extractRoomToken(value: string) {
+function getRoomKeyFromLocation() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeRoomKey(params.get(ROOM_KEY_PARAM));
+}
+
+function getStoredRoomKey() {
+  return normalizeRoomKey(window.localStorage.getItem(ROOM_KEY_STORAGE));
+}
+
+function buildRoomLink(roomKey: string) {
+  return `${window.location.origin}${window.location.pathname}?${ROOM_KEY_PARAM}=${encodeURIComponent(roomKey)}`;
+}
+
+function extractRoomKey(value: string) {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
@@ -201,31 +200,22 @@ function extractRoomToken(value: string) {
   if (trimmedValue.startsWith("http://") || trimmedValue.startsWith("https://")) {
     try {
       const url = new URL(trimmedValue);
-      const token = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash).get(ROOM_HASH_KEY);
-      return token ?? null;
+      const params = new URLSearchParams(url.search);
+      return normalizeRoomKey(params.get(ROOM_KEY_PARAM));
     } catch {
       return null;
     }
   }
 
   if (trimmedValue.includes("=")) {
-    const params = new URLSearchParams(trimmedValue.startsWith("#") ? trimmedValue.slice(1) : trimmedValue);
-    return params.get(ROOM_HASH_KEY);
+    const params = new URLSearchParams(trimmedValue.startsWith("?") ? trimmedValue.slice(1) : trimmedValue);
+    return normalizeRoomKey(params.get(ROOM_KEY_PARAM));
   }
 
-  return trimmedValue;
+  return normalizeRoomKey(trimmedValue);
 }
 
-function loadState(): DraftState {
-  const roomToken = getRoomTokenFromHash();
-
-  if (roomToken) {
-    const roomState = decodeRoomState(roomToken);
-    if (roomState) {
-      return roomState;
-    }
-  }
-
+function loadLocalDraft(): DraftState {
   const stored = window.localStorage.getItem(STORAGE_KEY);
 
   if (!stored) {
@@ -239,8 +229,59 @@ function loadState(): DraftState {
   }
 }
 
+async function fetchRoomDraft(roomKey: string): Promise<DraftState> {
+  if (!API_BASE_URL) {
+    throw new Error("Missing API base URL");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/data?roomKey=${encodeURIComponent(roomKey)}`, {
+    headers: {
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load room: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  return normalizeDraftState(payload) ?? initialState;
+}
+
+async function saveRoomDraft(roomKey: string, draft: DraftState) {
+  if (!API_BASE_URL) {
+    throw new Error("Missing API base URL");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ roomKey, draft }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save room: ${response.status}`);
+  }
+}
+
 function saveLocalDraft(draft: DraftState) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+}
+
+function updateRoomLocation(roomKey: string | null) {
+  const nextUrl = new URL(window.location.href);
+
+  if (roomKey) {
+    nextUrl.searchParams.set(ROOM_KEY_PARAM, roomKey);
+  } else {
+    nextUrl.searchParams.delete(ROOM_KEY_PARAM);
+  }
+
+  window.history.replaceState(null, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
 }
 
 function getManagerForPick(managers: Manager[], pickIndex: number) {
@@ -256,12 +297,16 @@ function getManagerForPick(managers: Manager[], pickIndex: number) {
 }
 
 function App() {
-  const [draft, setDraft] = useState<DraftState>(loadState);
-  const [managerDraft, setManagerDraft] = useState(draft.managers.map((manager) => manager.name).join(", "));
+  const initialRoomKey = getRoomKeyFromLocation() ?? getStoredRoomKey();
+  const [draft, setDraft] = useState<DraftState>(loadLocalDraft);
+  const [managerDraft, setManagerDraft] = useState(() => loadLocalDraft().managers.map((manager) => manager.name).join(", "));
   const [query, setQuery] = useState("");
   const [poolView, setPoolView] = useState<"group" | "confederation" | "rank">("group");
-  const [shareStatus, setShareStatus] = useState<ShareStatus>("idle");
-  const [roomInput, setRoomInput] = useState("");
+  const [roomKey, setRoomKey] = useState<string | null>(initialRoomKey);
+  const [roomInput, setRoomInput] = useState(initialRoomKey ?? "");
+  const [roomStatus, setRoomStatus] = useState<RoomSyncStatus>(initialRoomKey ? "loading" : "local");
+  const [roomMessage, setRoomMessage] = useState(initialRoomKey ? "Loading room" : "Local-only draft");
+  const roomLoadedRef = useRef(!initialRoomKey);
 
   useEffect(() => {
     saveLocalDraft(draft);
@@ -271,22 +316,76 @@ function App() {
     setManagerDraft(draft.managers.map((manager) => manager.name).join(", "));
   }, [draft.managers]);
 
-  const roomToken = useMemo(() => encodeRoomState(draft), [draft]);
-  const roomLink = useMemo(() => buildRoomLink(roomToken), [roomToken]);
+  const roomLink = useMemo(() => (roomKey ? buildRoomLink(roomKey) : ""), [roomKey]);
 
   useEffect(() => {
-    const nextUrl = `${window.location.pathname}${window.location.search}#${ROOM_HASH_KEY}=${roomToken}`;
-    window.history.replaceState(null, "", nextUrl);
-  }, [roomToken]);
-
-  useEffect(() => {
-    if (shareStatus !== "copied") {
+    if (!roomKey || !API_BASE_URL) {
+      roomLoadedRef.current = true;
+      setRoomStatus(roomKey ? "error" : "local");
+      setRoomMessage(roomKey ? "API base URL is missing" : "Local-only draft");
+      if (!roomKey) {
+        updateRoomLocation(null);
+        window.localStorage.removeItem(ROOM_KEY_STORAGE);
+      }
       return;
     }
 
-    const timerId = window.setTimeout(() => setShareStatus("idle"), 2000);
+    let active = true;
+    setRoomStatus("loading");
+    setRoomMessage("Loading room");
+    roomLoadedRef.current = false;
+
+    void fetchRoomDraft(roomKey)
+      .then((remoteDraft) => {
+        if (!active) {
+          return;
+        }
+
+        setDraft(remoteDraft);
+        saveLocalDraft(remoteDraft);
+        roomLoadedRef.current = true;
+        setRoomStatus("saved");
+        setRoomMessage("Room loaded");
+        updateRoomLocation(roomKey);
+        window.localStorage.setItem(ROOM_KEY_STORAGE, roomKey);
+      })
+      .catch(() => {
+        if (!active) {
+          return;
+        }
+
+        roomLoadedRef.current = true;
+        setRoomStatus("error");
+        setRoomMessage("Could not load that room key");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [roomKey]);
+
+  useEffect(() => {
+    if (!roomKey || !roomLoadedRef.current || !API_BASE_URL) {
+      return;
+    }
+
+    setRoomStatus("saving");
+    setRoomMessage("Saving room");
+
+    const timerId = window.setTimeout(() => {
+      void saveRoomDraft(roomKey, draft)
+        .then(() => {
+          setRoomStatus("saved");
+          setRoomMessage("Room saved");
+        })
+        .catch(() => {
+          setRoomStatus("error");
+          setRoomMessage("Save failed");
+        });
+    }, 500);
+
     return () => window.clearTimeout(timerId);
-  }, [shareStatus]);
+  }, [draft, roomKey]);
 
   const commitDraft = (updater: (current: DraftState) => DraftState) => {
     setDraft((current) => {
@@ -407,40 +506,85 @@ function App() {
   };
 
   const copyRoomLink = async () => {
+    if (!roomLink) {
+      setRoomStatus("error");
+      setRoomMessage("Create or join a room first");
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(roomLink);
-      setShareStatus("copied");
+      setRoomMessage("Room link copied");
     } catch {
-      setShareStatus("error");
+      setRoomStatus("error");
+      setRoomMessage("Clipboard blocked");
     }
   };
 
-  const loadRoomFromInput = () => {
-    const token = extractRoomToken(roomInput);
+  const connectRoom = async (nextRoomKey: string) => {
+    const normalizedRoomKey = normalizeRoomKey(nextRoomKey);
 
-    if (!token) {
+    if (!normalizedRoomKey) {
+      setRoomStatus("error");
+      setRoomMessage("Room key must be at least 16 characters");
       return;
     }
 
-    const roomState = decodeRoomState(token);
-
-    if (!roomState) {
-      setShareStatus("error");
+    if (!API_BASE_URL) {
+      setRoomStatus("error");
+      setRoomMessage("Missing API base URL");
       return;
     }
 
-    setDraft(roomState);
-    saveLocalDraft(roomState);
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${ROOM_HASH_KEY}=${token}`);
-    setShareStatus("idle");
+    setRoomStatus("loading");
+    setRoomMessage("Loading room");
+    const remoteDraft = await fetchRoomDraft(normalizedRoomKey);
+    setDraft(remoteDraft);
+    saveLocalDraft(remoteDraft);
+    setRoomKey(normalizedRoomKey);
+    setRoomInput(normalizedRoomKey);
+    roomLoadedRef.current = true;
+    setRoomStatus("saved");
+    setRoomMessage("Room connected");
+    window.localStorage.setItem(ROOM_KEY_STORAGE, normalizedRoomKey);
+    updateRoomLocation(normalizedRoomKey);
   };
 
-  const startFreshRoom = () => {
-    setDraft(initialState);
-    saveLocalDraft(initialState);
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  const createRoom = async () => {
+    const nextRoomKey = createRoomKey();
+
+    if (!API_BASE_URL) {
+      setRoomStatus("error");
+      setRoomMessage("Missing API base URL");
+      return;
+    }
+
+    setRoomStatus("saving");
+    setRoomMessage("Creating room");
+
+    try {
+      await saveRoomDraft(nextRoomKey, draft);
+      setRoomKey(nextRoomKey);
+      roomLoadedRef.current = true;
+      setRoomStatus("saved");
+      setRoomMessage("Room created");
+      window.localStorage.setItem(ROOM_KEY_STORAGE, nextRoomKey);
+      updateRoomLocation(nextRoomKey);
+      setRoomInput(nextRoomKey);
+    } catch {
+      setRoomStatus("error");
+      setRoomMessage("Room creation failed");
+    }
+  };
+
+  const leaveRoom = () => {
+    setRoomKey(null);
+    roomLoadedRef.current = true;
+    setRoomStatus("local");
+    setRoomMessage("Local-only draft");
+    window.localStorage.removeItem(ROOM_KEY_STORAGE);
+    updateRoomLocation(null);
     setRoomInput("");
-    setShareStatus("idle");
   };
 
   return (
@@ -478,22 +622,19 @@ function App() {
           <strong>Snake</strong>
           <small>{draft.managers.length} managers</small>
         </div>
-        <div className={shareStatus === "copied" ? "status-panel sync-panel live" : "status-panel sync-panel"}>
-          <span>Room link</span>
-          <strong>{shareStatus === "copied" ? "Copied" : "Share snapshot"}</strong>
-          <small>
-            {shareStatus === "error"
-              ? "Clipboard blocked. Copy the URL from the address bar."
-              : "Open this link on another device to load the same draft."}
-          </small>
+        <div className={roomStatus === "saved" ? "status-panel sync-panel live" : "status-panel sync-panel"}>
+          <span>Room sync</span>
+          <strong>{roomKey ? roomKey.slice(0, 8) : "Local only"}</strong>
+          <small>{roomMessage}</small>
           <input
             className="room-link-input"
             readOnly
             value={roomLink}
             onFocus={(event) => event.currentTarget.select()}
             aria-label="Shareable room link"
+            placeholder="Create or join a room to get a link"
           />
-          <button className="ghost-button" onClick={copyRoomLink}>
+          <button className="ghost-button" onClick={copyRoomLink} disabled={!roomKey}>
             Copy link
           </button>
           <label className="room-join-field">
@@ -501,16 +642,19 @@ function App() {
             <input
               value={roomInput}
               onChange={(event) => setRoomInput(event.target.value)}
-              placeholder="Paste a shared link or room token"
+              placeholder="Paste a room link or room key"
               aria-label="Join shared room"
             />
           </label>
           <div className="room-actions">
-            <button className="ghost-button" onClick={loadRoomFromInput} disabled={!roomInput.trim()}>
-              Open room
+            <button className="ghost-button" onClick={() => void connectRoom(extractRoomKey(roomInput) ?? "")} disabled={!roomInput.trim()}>
+              Join room
             </button>
-            <button className="ghost-button" onClick={startFreshRoom}>
-              New room
+            <button className="ghost-button" onClick={() => void createRoom()}>
+              Create room
+            </button>
+            <button className="ghost-button" onClick={leaveRoom} disabled={!roomKey}>
+              Leave room
             </button>
           </div>
         </div>

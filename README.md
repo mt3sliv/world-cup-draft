@@ -18,7 +18,15 @@ npm install
 npm run dev
 ```
 
-To enable cross-device sync locally, copy `.env.example` to `.env.local` and fill in your Firebase web app config values.
+To enable room sync locally, copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to your API server.
+
+The API lives in `api/`. Install and run it separately:
+
+```bash
+cd api
+npm install
+npm start
+```
 
 ## Build
 
@@ -26,47 +34,38 @@ To enable cross-device sync locally, copy `.env.example` to `.env.local` and fil
 npm run build
 ```
 
-## Firebase Setup
+## Room Key API Setup
 
-1. Create a Firebase project.
-2. Add a Web app in Project settings.
-3. Create a Firestore database.
-4. Add these values from the Firebase web app config to `.env.local` for local development and to GitHub repository secrets for Pages deploys:
+1. Set `VITE_API_BASE_URL` for the Pages app so it knows where the API is hosted.
+2. Set these values for the API server:
 
 ```text
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_STORAGE_BUCKET
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_APP_ID
+OWNER
+REPO
+GITHUB_TOKEN
+BRANCH
+CORS_ORIGIN
 ```
 
-The app stores one document per room at `draftRooms/{roomId}`.
+The API stores one draft document per room key in `api/data.json`.
 
-For a friends-only draft, this simple Firestore rule is enough to get started while you are sharing room IDs privately:
+Use the room key flow like this:
 
 ```text
-rules_version = '2';
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /draftRooms/{roomId} {
-      allow read, write: if true;
-    }
-  }
-}
+Create room -> share link -> others join with room key or full link -> all edits save to the same room.
 ```
 
-Before sharing broadly, replace that open rule with authentication or a room invite/passcode rule.
+The room key is the access control boundary. If someone has the key, they can load and save that room.
 
 ## Deployment
 
 The app is configured for GitHub Pages at `/world-cup-draft/`. Enable Pages in the repository settings and select GitHub Actions as the source. Pushes to `main` will build and deploy the `dist` output.
 
+Set `VITE_API_BASE_URL` in the repository variables or workflow environment so the Pages build can reach the API.
+
 ## Next Milestones
 
 - Replace the sample country pool with the finalized tournament field
-- Add Firebase league rooms and real-time sync
+- Harden the API with auth if you need stronger room protection
 - Add admin controls, timer, and pick history
 - Add World Cup scoring and standings

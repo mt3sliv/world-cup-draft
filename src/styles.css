@@ -198,6 +198,10 @@ label,
   gap: 8px;
 }
 
+.room-actions .ghost-button:last-child {
+  grid-column: 1 / -1;
+}
+
 .sync-error {
   margin: -2px 0 14px;
   color: #9f1f2e;
