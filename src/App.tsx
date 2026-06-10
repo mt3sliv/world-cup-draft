@@ -35,10 +35,14 @@ type DraftState = {
 const STORAGE_KEY = "world-cup-draft-state-v1";
 
 const DEFAULT_MANAGERS: Manager[] = [
-  { id: "m1", name: "Alex" },
-  { id: "m2", name: "Casey" },
-  { id: "m3", name: "Jordan" },
-  { id: "m4", name: "Taylor" },
+  { id: "m1", name: "Devon" },
+  { id: "m2", name: "Kai" },
+  { id: "m3", name: "Alex" },
+  { id: "m4", name: "Spencer" },
+  { id: "m5", name: "Josh" },
+  { id: "m6", name: "Jeremy" },
+  { id: "m7", name: "Matt" },
+  { id: "m8", name: "Dan" },
 ];
 
 const COUNTRIES: Country[] = [
@@ -119,6 +123,10 @@ function loadState(): DraftState {
   }
 }
 
+function saveLocalDraft(draft: DraftState) {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+}
+
 function getManagerForPick(managers: Manager[], pickIndex: number) {
   const roundIndex = Math.floor(pickIndex / managers.length);
   const slotIndex = pickIndex % managers.length;
@@ -138,8 +146,16 @@ function App() {
   const [poolView, setPoolView] = useState<"group" | "confederation" | "rank">("group");
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    saveLocalDraft(draft);
   }, [draft]);
+
+  const commitDraft = (updater: (current: DraftState) => DraftState) => {
+    setDraft((current) => {
+      const nextDraft = updater(current);
+      saveLocalDraft(nextDraft);
+      return nextDraft;
+    });
+  };
 
   const draftedIds = useMemo(() => new Set(draft.picks.map((pick) => pick.countryId)), [draft.picks]);
   const nextPick = getManagerForPick(draft.managers, draft.picks.length);
@@ -203,16 +219,26 @@ function App() {
       return;
     }
 
-    const pick: Pick = {
-      id: crypto.randomUUID(),
-      round: nextPick.round,
-      slot: nextPick.slot,
-      managerId: nextPick.manager.id,
-      countryId: country.id,
-      createdAt: Date.now(),
+    const makePick = (currentDraft: DraftState): Pick | null => {
+      const remoteNextPick = getManagerForPick(currentDraft.managers, currentDraft.picks.length);
+      if (!remoteNextPick.manager) {
+        return null;
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        round: remoteNextPick.round,
+        slot: remoteNextPick.slot,
+        managerId: remoteNextPick.manager.id,
+        countryId: country.id,
+        createdAt: Date.now(),
+      };
     };
 
-    setDraft((current) => ({ ...current, picks: [...current.picks, pick] }));
+    commitDraft((current) => {
+      const pick = makePick(current);
+      return pick ? { ...current, picks: [...current.picks, pick] } : current;
+    });
   };
 
   const updateManagers = () => {
@@ -226,7 +252,7 @@ function App() {
       return;
     }
 
-    setDraft((current) => ({
+    commitDraft((current) => ({
       ...current,
       managers: names.map((name, index) => ({ id: `m${index + 1}`, name })),
       picks: [],
@@ -234,11 +260,11 @@ function App() {
   };
 
   const undoPick = () => {
-    setDraft((current) => ({ ...current, picks: current.picks.slice(0, -1) }));
+    commitDraft((current) => ({ ...current, picks: current.picks.slice(0, -1) }));
   };
 
   const resetDraft = () => {
-    setDraft((current) => ({ ...current, picks: [] }));
+    commitDraft((current) => ({ ...current, picks: [] }));
   };
 
   return (
@@ -289,7 +315,7 @@ function App() {
             League name
             <input
               value={draft.leagueName}
-              onChange={(event) => setDraft((current) => ({ ...current, leagueName: event.target.value }))}
+              onChange={(event) => commitDraft((current) => ({ ...current, leagueName: event.target.value }))}
             />
           </label>
 

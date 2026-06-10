@@ -18,11 +18,47 @@ npm install
 npm run dev
 ```
 
+To enable cross-device sync locally, copy `.env.example` to `.env.local` and fill in your Firebase web app config values.
+
 ## Build
 
 ```bash
 npm run build
 ```
+
+## Firebase Setup
+
+1. Create a Firebase project.
+2. Add a Web app in Project settings.
+3. Create a Firestore database.
+4. Add these values from the Firebase web app config to `.env.local` for local development and to GitHub repository secrets for Pages deploys:
+
+```text
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+```
+
+The app stores one document per room at `draftRooms/{roomId}`.
+
+For a friends-only draft, this simple Firestore rule is enough to get started while you are sharing room IDs privately:
+
+```text
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /draftRooms/{roomId} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+Before sharing broadly, replace that open rule with authentication or a room invite/passcode rule.
 
 ## Deployment
 

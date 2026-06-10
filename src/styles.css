@@ -123,7 +123,7 @@ h3 {
 }
 
 .status-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 18px;
 }
 
@@ -171,6 +171,18 @@ label,
 .current-pick span,
 .current-pick small {
   color: rgba(255, 255, 255, 0.76);
+}
+
+.sync-panel.live {
+  border-color: rgba(12, 91, 75, 0.34);
+  background: #e7f0e7;
+}
+
+.sync-error {
+  margin: -2px 0 14px;
+  color: #9f1f2e;
+  font-size: 0.82rem;
+  font-weight: 750;
 }
 
 .workspace {
