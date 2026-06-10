@@ -10,8 +10,11 @@ type Country = {
   id: string;
   name: string;
   group: string;
-  region: string;
-  rating: number;
+  confederation: "AFC" | "CAF" | "CONCACAF" | "CONMEBOL" | "OFC" | "UEFA";
+  fifaRank?: number;
+  flag: string;
+  host?: boolean;
+  debut?: boolean;
 };
 
 type Pick = {
@@ -39,39 +42,58 @@ const DEFAULT_MANAGERS: Manager[] = [
 ];
 
 const COUNTRIES: Country[] = [
-  { id: "arg", name: "Argentina", group: "Pot A", region: "CONMEBOL", rating: 96 },
-  { id: "fra", name: "France", group: "Pot A", region: "UEFA", rating: 95 },
-  { id: "bra", name: "Brazil", group: "Pot A", region: "CONMEBOL", rating: 94 },
-  { id: "eng", name: "England", group: "Pot A", region: "UEFA", rating: 93 },
-  { id: "esp", name: "Spain", group: "Pot A", region: "UEFA", rating: 92 },
-  { id: "por", name: "Portugal", group: "Pot A", region: "UEFA", rating: 91 },
-  { id: "ned", name: "Netherlands", group: "Pot A", region: "UEFA", rating: 90 },
-  { id: "ger", name: "Germany", group: "Pot A", region: "UEFA", rating: 89 },
-  { id: "bel", name: "Belgium", group: "Pot B", region: "UEFA", rating: 88 },
-  { id: "uru", name: "Uruguay", group: "Pot B", region: "CONMEBOL", rating: 87 },
-  { id: "cro", name: "Croatia", group: "Pot B", region: "UEFA", rating: 86 },
-  { id: "ita", name: "Italy", group: "Pot B", region: "UEFA", rating: 85 },
-  { id: "col", name: "Colombia", group: "Pot B", region: "CONMEBOL", rating: 84 },
-  { id: "usa", name: "United States", group: "Pot B", region: "CONCACAF", rating: 83 },
-  { id: "mex", name: "Mexico", group: "Pot B", region: "CONCACAF", rating: 82 },
-  { id: "sui", name: "Switzerland", group: "Pot B", region: "UEFA", rating: 81 },
-  { id: "mar", name: "Morocco", group: "Pot C", region: "CAF", rating: 80 },
-  { id: "jpn", name: "Japan", group: "Pot C", region: "AFC", rating: 79 },
-  { id: "den", name: "Denmark", group: "Pot C", region: "UEFA", rating: 78 },
-  { id: "sen", name: "Senegal", group: "Pot C", region: "CAF", rating: 77 },
-  { id: "kor", name: "South Korea", group: "Pot C", region: "AFC", rating: 76 },
-  { id: "ecu", name: "Ecuador", group: "Pot C", region: "CONMEBOL", rating: 75 },
-  { id: "aut", name: "Austria", group: "Pot C", region: "UEFA", rating: 74 },
-  { id: "aus", name: "Australia", group: "Pot C", region: "AFC", rating: 73 },
-  { id: "can", name: "Canada", group: "Pot D", region: "CONCACAF", rating: 72 },
-  { id: "nga", name: "Nigeria", group: "Pot D", region: "CAF", rating: 71 },
-  { id: "tur", name: "Turkey", group: "Pot D", region: "UEFA", rating: 70 },
-  { id: "pol", name: "Poland", group: "Pot D", region: "UEFA", rating: 69 },
-  { id: "ukr", name: "Ukraine", group: "Pot D", region: "UEFA", rating: 68 },
-  { id: "egy", name: "Egypt", group: "Pot D", region: "CAF", rating: 67 },
-  { id: "par", name: "Paraguay", group: "Pot D", region: "CONMEBOL", rating: 66 },
-  { id: "chi", name: "Chile", group: "Pot D", region: "CONMEBOL", rating: 65 },
+  { id: "mex", name: "Mexico", group: "A", confederation: "CONCACAF", fifaRank: 15, flag: "🇲🇽", host: true },
+  { id: "rsa", name: "South Africa", group: "A", confederation: "CAF", fifaRank: 61, flag: "🇿🇦" },
+  { id: "kor", name: "South Korea", group: "A", confederation: "AFC", fifaRank: 22, flag: "🇰🇷" },
+  { id: "cze", name: "Czech Republic", group: "A", confederation: "UEFA", fifaRank: 44, flag: "🇨🇿" },
+  { id: "can", name: "Canada", group: "B", confederation: "CONCACAF", fifaRank: 27, flag: "🇨🇦", host: true },
+  { id: "bih", name: "Bosnia and Herzegovina", group: "B", confederation: "UEFA", fifaRank: 71, flag: "🇧🇦" },
+  { id: "qat", name: "Qatar", group: "B", confederation: "AFC", fifaRank: 51, flag: "🇶🇦" },
+  { id: "sui", name: "Switzerland", group: "B", confederation: "UEFA", fifaRank: 17, flag: "🇨🇭" },
+  { id: "bra", name: "Brazil", group: "C", confederation: "CONMEBOL", fifaRank: 5, flag: "🇧🇷" },
+  { id: "mar", name: "Morocco", group: "C", confederation: "CAF", fifaRank: 11, flag: "🇲🇦" },
+  { id: "hai", name: "Haiti", group: "C", confederation: "CONCACAF", fifaRank: 84, flag: "🇭🇹" },
+  { id: "sco", name: "Scotland", group: "C", confederation: "UEFA", fifaRank: 36, flag: "🏴" },
+  { id: "usa", name: "United States", group: "D", confederation: "CONCACAF", fifaRank: 14, flag: "🇺🇸", host: true },
+  { id: "par", name: "Paraguay", group: "D", confederation: "CONMEBOL", fifaRank: 39, flag: "🇵🇾" },
+  { id: "aus", name: "Australia", group: "D", confederation: "AFC", fifaRank: 26, flag: "🇦🇺" },
+  { id: "tur", name: "Turkey", group: "D", confederation: "UEFA", fifaRank: 25, flag: "🇹🇷" },
+  { id: "ger", name: "Germany", group: "E", confederation: "UEFA", fifaRank: 9, flag: "🇩🇪" },
+  { id: "cuw", name: "Curacao", group: "E", confederation: "CONCACAF", fifaRank: 82, flag: "🇨🇼", debut: true },
+  { id: "civ", name: "Ivory Coast", group: "E", confederation: "CAF", fifaRank: 42, flag: "🇨🇮" },
+  { id: "ecu", name: "Ecuador", group: "E", confederation: "CONMEBOL", fifaRank: 23, flag: "🇪🇨" },
+  { id: "ned", name: "Netherlands", group: "F", confederation: "UEFA", fifaRank: 7, flag: "🇳🇱" },
+  { id: "jpn", name: "Japan", group: "F", confederation: "AFC", fifaRank: 18, flag: "🇯🇵" },
+  { id: "swe", name: "Sweden", group: "F", confederation: "UEFA", flag: "🇸🇪" },
+  { id: "tun", name: "Tunisia", group: "F", confederation: "CAF", fifaRank: 40, flag: "🇹🇳" },
+  { id: "bel", name: "Belgium", group: "G", confederation: "UEFA", fifaRank: 8, flag: "🇧🇪" },
+  { id: "egy", name: "Egypt", group: "G", confederation: "CAF", fifaRank: 34, flag: "🇪🇬" },
+  { id: "irn", name: "Iran", group: "G", confederation: "AFC", fifaRank: 20, flag: "🇮🇷" },
+  { id: "nzl", name: "New Zealand", group: "G", confederation: "OFC", fifaRank: 86, flag: "🇳🇿" },
+  { id: "esp", name: "Spain", group: "H", confederation: "UEFA", fifaRank: 1, flag: "🇪🇸" },
+  { id: "cpv", name: "Cape Verde", group: "H", confederation: "CAF", fifaRank: 68, flag: "🇨🇻", debut: true },
+  { id: "ksa", name: "Saudi Arabia", group: "H", confederation: "AFC", fifaRank: 60, flag: "🇸🇦" },
+  { id: "uru", name: "Uruguay", group: "H", confederation: "CONMEBOL", fifaRank: 16, flag: "🇺🇾" },
+  { id: "fra", name: "France", group: "I", confederation: "UEFA", fifaRank: 3, flag: "🇫🇷" },
+  { id: "sen", name: "Senegal", group: "I", confederation: "CAF", fifaRank: 19, flag: "🇸🇳" },
+  { id: "irq", name: "Iraq", group: "I", confederation: "AFC", flag: "🇮🇶" },
+  { id: "nor", name: "Norway", group: "I", confederation: "UEFA", fifaRank: 29, flag: "🇳🇴" },
+  { id: "arg", name: "Argentina", group: "J", confederation: "CONMEBOL", fifaRank: 2, flag: "🇦🇷" },
+  { id: "alg", name: "Algeria", group: "J", confederation: "CAF", fifaRank: 35, flag: "🇩🇿" },
+  { id: "aut", name: "Austria", group: "J", confederation: "UEFA", fifaRank: 24, flag: "🇦🇹" },
+  { id: "jor", name: "Jordan", group: "J", confederation: "AFC", fifaRank: 66, flag: "🇯🇴", debut: true },
+  { id: "por", name: "Portugal", group: "K", confederation: "UEFA", fifaRank: 6, flag: "🇵🇹" },
+  { id: "cod", name: "DR Congo", group: "K", confederation: "CAF", flag: "🇨🇩" },
+  { id: "uzb", name: "Uzbekistan", group: "K", confederation: "AFC", fifaRank: 50, flag: "🇺🇿", debut: true },
+  { id: "col", name: "Colombia", group: "K", confederation: "CONMEBOL", fifaRank: 13, flag: "🇨🇴" },
+  { id: "eng", name: "England", group: "L", confederation: "UEFA", fifaRank: 4, flag: "🏴" },
+  { id: "cro", name: "Croatia", group: "L", confederation: "UEFA", fifaRank: 10, flag: "🇭🇷" },
+  { id: "gha", name: "Ghana", group: "L", confederation: "CAF", fifaRank: 72, flag: "🇬🇭" },
+  { id: "pan", name: "Panama", group: "L", confederation: "CONCACAF", fifaRank: 30, flag: "🇵🇦" },
 ];
+
+const GROUPS = Array.from(new Set(COUNTRIES.map((country) => country.group)));
+const CONFEDERATIONS = Array.from(new Set(COUNTRIES.map((country) => country.confederation)));
 
 const initialState: DraftState = {
   leagueName: "Basement World Cup League",
@@ -113,6 +135,7 @@ function App() {
   const [draft, setDraft] = useState<DraftState>(loadState);
   const [managerDraft, setManagerDraft] = useState(draft.managers.map((manager) => manager.name).join(", "));
   const [query, setQuery] = useState("");
+  const [poolView, setPoolView] = useState<"group" | "confederation" | "rank">("group");
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -124,10 +147,46 @@ function App() {
 
   const availableCountries = useMemo(() => {
     return COUNTRIES.filter((country) => {
-      const matchesQuery = country.name.toLowerCase().includes(query.toLowerCase());
+      const normalizedQuery = query.toLowerCase();
+      const matchesQuery =
+        country.name.toLowerCase().includes(normalizedQuery) ||
+        country.group.toLowerCase().includes(normalizedQuery) ||
+        country.confederation.toLowerCase().includes(normalizedQuery);
       return !draftedIds.has(country.id) && matchesQuery;
+    }).sort((first, second) => {
+      if (poolView === "rank") {
+        return (first.fifaRank ?? 999) - (second.fifaRank ?? 999);
+      }
+
+      if (poolView === "confederation") {
+        return first.confederation.localeCompare(second.confederation) || first.group.localeCompare(second.group);
+      }
+
+      return first.group.localeCompare(second.group) || (first.fifaRank ?? 999) - (second.fifaRank ?? 999);
     });
-  }, [draftedIds, query]);
+  }, [draftedIds, poolView, query]);
+
+  const groupedCountries = useMemo(() => {
+    const getHeading = (country: Country) => {
+      if (poolView === "confederation") {
+        return country.confederation;
+      }
+
+      if (poolView === "rank") {
+        if (!country.fifaRank) {
+          return "Unranked playoff qualifiers";
+        }
+        return country.fifaRank <= 12 ? "Top seeds" : country.fifaRank <= 30 ? "Contenders" : "Chasers";
+      }
+
+      return `Group ${country.group}`;
+    };
+
+    return availableCountries.reduce<Record<string, Country[]>>((sections, country) => {
+      const heading = getHeading(country);
+      return { ...sections, [heading]: [...(sections[heading] ?? []), country] };
+    }, {});
+  }, [availableCountries, poolView]);
 
   const picksByManager = useMemo(() => {
     return draft.managers.map((manager) => ({
@@ -272,7 +331,11 @@ function App() {
                       R{roundIndex + 1}.{managerIndex + 1}
                     </span>
                     <strong>{country?.name ?? snakeManager.name}</strong>
-                    <small>{country ? `${country.group} / ${country.region}` : "Waiting"}</small>
+                    <small>
+                      {country
+                        ? `Group ${country.group} / ${country.confederation}${country.fifaRank ? ` / Rank ${country.fifaRank}` : ""}`
+                        : "Waiting"}
+                    </small>
                   </article>
                 );
               }),
@@ -286,20 +349,49 @@ function App() {
           <h2>Country Pool</h2>
           <input
             className="search-input"
-            placeholder="Search countries"
+            placeholder="Search teams, groups, confederations"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
 
-        <div className="country-grid">
-          {availableCountries.map((country) => (
-            <button className="country-card" key={country.id} onClick={() => draftCountry(country)}>
-              <span className="country-code">{country.id.toUpperCase()}</span>
-              <strong>{country.name}</strong>
-              <small>{country.region}</small>
-              <meter min="0" max="100" value={country.rating} />
-            </button>
+        <div className="pool-controls" role="group" aria-label="Country pool organization">
+          <button className={poolView === "group" ? "active" : ""} onClick={() => setPoolView("group")}>
+            Groups
+          </button>
+          <button className={poolView === "confederation" ? "active" : ""} onClick={() => setPoolView("confederation")}>
+            Confederations
+          </button>
+          <button className={poolView === "rank" ? "active" : ""} onClick={() => setPoolView("rank")}>
+            FIFA rank
+          </button>
+        </div>
+
+        <div className="country-sections">
+          {Object.entries(groupedCountries).map(([heading, countries]) => (
+            <section className="country-group" key={heading}>
+              <div className="country-group-heading">
+                <h3>{heading}</h3>
+                <span>{countries.length} available</span>
+              </div>
+              <div className="country-grid">
+                {countries.map((country) => (
+                  <button className="country-card" key={country.id} onClick={() => draftCountry(country)}>
+                    <span className="flag" aria-hidden="true">
+                      {country.flag}
+                    </span>
+                    <span className="country-code">Group {country.group}</span>
+                    <strong>{country.name}</strong>
+                    <small>{country.confederation}</small>
+                    <span className="meta-row">
+                      <span>{country.fifaRank ? `Rank ${country.fifaRank}` : "Rank TBD"}</span>
+                      {country.host ? <span>Host</span> : null}
+                      {country.debut ? <span>Debut</span> : null}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </section>
@@ -318,7 +410,7 @@ function App() {
                   {picks.map((country) => (
                     <li key={country.id}>
                       <span>{country.name}</span>
-                      <small>{country.rating}</small>
+                      <small>{country.fifaRank ? `#${country.fifaRank}` : country.group}</small>
                     </li>
                   ))}
                 </ol>
